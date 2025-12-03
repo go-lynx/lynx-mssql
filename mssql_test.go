@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-lynx/lynx-mssql/conf"
 	"github.com/go-lynx/lynx/plugins"
-	"github.com/go-lynx/lynx/plugins/sql/mssql/conf"
 	"google.golang.org/protobuf/types/known/durationpb"
 )
 

@@ -8,11 +8,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/go-lynx/lynx/app/log"
+	"github.com/go-lynx/lynx-mssql/conf"
+	"github.com/go-lynx/lynx-sql-sdk/base"
+	"github.com/go-lynx/lynx-sql-sdk/interfaces"
+	"github.com/go-lynx/lynx/log"
 	"github.com/go-lynx/lynx/plugins"
-	"github.com/go-lynx/lynx/plugins/sql/base"
-	"github.com/go-lynx/lynx/plugins/sql/interfaces"
-	"github.com/go-lynx/lynx/plugins/sql/mssql/conf"
 	"google.golang.org/protobuf/types/known/durationpb"
 )
 

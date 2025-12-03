@@ -1,8 +1,8 @@
 package mssql
 
 import (
-	"github.com/go-lynx/lynx/plugins/sql/base"
-	"github.com/go-lynx/lynx/plugins/sql/mssql/conf"
+	"github.com/go-lynx/lynx-mssql/conf"
+	"github.com/go-lynx/lynx-sql-sdk/base"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )

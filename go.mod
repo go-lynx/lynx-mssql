@@ -1,4 +1,4 @@
-module github.com/go-lynx/lynx/plugins/sql/mssql
+module github.com/go-lynx/lynx-mssql
 
 go 1.25
 
@@ -6,8 +6,7 @@ toolchain go1.25.3
 
 require (
 	github.com/go-lynx/lynx v1.2.3
-	github.com/go-lynx/lynx/plugins/sql/base v1.2.3
-	github.com/go-lynx/lynx/plugins/sql/interfaces v1.2.3
+	github.com/go-lynx/lynx-sql-sdk v0.0.0-00010101000000-000000000000
 	github.com/prometheus/client_golang v1.23.0
 	google.golang.org/protobuf v1.36.10
 )
@@ -48,8 +47,6 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-replace (
-	github.com/go-lynx/lynx => ../../../
-	github.com/go-lynx/lynx/plugins/sql/base => ../base
-	github.com/go-lynx/lynx/plugins/sql/interfaces => ../interfaces
-)
+replace github.com/go-lynx/lynx => ../lynx
+
+replace github.com/go-lynx/lynx-sql-sdk => ../lynx-sql-sdk

@@ -4,10 +4,10 @@ import (
 	"database/sql"
 	"fmt"
 
-	"github.com/go-lynx/lynx/app"
-	"github.com/go-lynx/lynx/app/factory"
+	"github.com/go-lynx/lynx"
+	"github.com/go-lynx/lynx-sql-sdk/interfaces"
+	"github.com/go-lynx/lynx/pkg/factory"
 	"github.com/go-lynx/lynx/plugins"
-	"github.com/go-lynx/lynx/plugins/sql/interfaces"
 )
 
 // init function registers the Microsoft SQL Server plugin to the global plugin factory.
@@ -34,7 +34,7 @@ func init() {
 func GetMssqlClient() (*DBMssqlClient, error) {
 	// Get the plugin with the specified name from the application's plugin manager,
 	// convert it to *DBMssqlClient type, and return it
-	plugin := app.Lynx().GetPluginManager().GetPlugin(pluginName)
+	plugin := lynx.Lynx().GetPluginManager().GetPlugin(pluginName)
 	if client, ok := plugin.(*DBMssqlClient); ok {
 		return client, nil
 	}
@@ -57,7 +57,7 @@ func GetMssqlDB() (*sql.DB, error) {
 // GetDB gets the database connection from the MSSQL plugin.
 // This function provides a unified API consistent with MySQL and PostgreSQL plugins.
 func GetDB() (*sql.DB, error) {
-	plugin := app.Lynx().GetPluginManager().GetPlugin(pluginName)
+	plugin := lynx.Lynx().GetPluginManager().GetPlugin(pluginName)
 	if plugin == nil {
 		return nil, fmt.Errorf("plugin %s not found", pluginName)
 	}
@@ -70,7 +70,7 @@ func GetDB() (*sql.DB, error) {
 // GetDialect gets the database dialect.
 // This function provides a unified API consistent with MySQL and PostgreSQL plugins.
 func GetDialect() string {
-	plugin := app.Lynx().GetPluginManager().GetPlugin(pluginName)
+	plugin := lynx.Lynx().GetPluginManager().GetPlugin(pluginName)
 	if plugin == nil {
 		return ""
 	}
@@ -83,7 +83,7 @@ func GetDialect() string {
 // IsConnected checks if the database is connected.
 // This function provides a unified API consistent with MySQL and PostgreSQL plugins.
 func IsConnected() bool {
-	plugin := app.Lynx().GetPluginManager().GetPlugin(pluginName)
+	plugin := lynx.Lynx().GetPluginManager().GetPlugin(pluginName)
 	if plugin == nil {
 		return false
 	}
@@ -96,7 +96,7 @@ func IsConnected() bool {
 // CheckHealth performs health check.
 // This function provides a unified API consistent with MySQL and PostgreSQL plugins.
 func CheckHealth() error {
-	plugin := app.Lynx().GetPluginManager().GetPlugin(pluginName)
+	plugin := lynx.Lynx().GetPluginManager().GetPlugin(pluginName)
 	if plugin == nil {
 		return fmt.Errorf("plugin %s not found", pluginName)
 	}
