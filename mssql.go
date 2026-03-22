@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/go-kratos/kratos/v2/config"
 	"github.com/go-lynx/lynx-mssql/conf"
 	"github.com/go-lynx/lynx-sql-sdk/base"
 	"github.com/go-lynx/lynx-sql-sdk/interfaces"
@@ -92,8 +93,10 @@ func (m *DBMssqlClient) Configure(c any) error {
 
 // InitializeResources initializes the plugin with configuration
 func (m *DBMssqlClient) InitializeResources(rt plugins.Runtime) error {
-	// Validate configuration
-	// Validate configuration
+	if err := rt.GetConfig().Value(confPrefix).Scan(m.config); err != nil {
+		return fmt.Errorf("failed to load mssql configuration: %w", err)
+	}
+
 	if m.config.Driver == "" {
 		return fmt.Errorf("driver is required")
 	}
@@ -106,8 +109,21 @@ func (m *DBMssqlClient) InitializeResources(rt plugins.Runtime) error {
 		m.config.Source = buildDSN(m.config)
 	}
 
+	m.SQLPlugin = base.NewBaseSQLPlugin(
+		plugins.GeneratePluginID("", pluginName, pluginVersion),
+		pluginName,
+		pluginDescription,
+		pluginVersion,
+		confPrefix,
+		102,
+		convertToBaseConfig(m.config),
+	)
+
 	// Initialize SQL plugin
-	if err := m.SQLPlugin.InitializeResources(rt); err != nil {
+	if err := m.SQLPlugin.InitializeResources(&runtimeConfigAdapter{
+		Runtime: rt,
+		config:  convertToBaseConfig(m.config),
+	}); err != nil {
 		return err
 	}
 
@@ -140,6 +156,10 @@ func (m *DBMssqlClient) StartupTasks() error {
 
 // CleanupTasks gracefully shuts down the plugin
 func (m *DBMssqlClient) CleanupTasks() error {
+	if m.closed {
+		return nil
+	}
+
 	log.Infof("shutting down Microsoft SQL Server client plugin")
 
 	// Signal background tasks to stop (protected against multiple calls)
@@ -429,3 +449,50 @@ func buildDSN(mssqlConf *conf.Mssql) string {
 
 	return dsn
 }
+
+type runtimeConfigAdapter struct {
+	plugins.Runtime
+	config *interfaces.Config
+}
+
+func (r *runtimeConfigAdapter) GetConfig() config.Config {
+	return &configAdapter{config: r.config}
+}
+
+type configAdapter struct {
+	config *interfaces.Config
+}
+
+func (c *configAdapter) Value(key string) config.Value {
+	return &configValueAdapter{config: c.config}
+}
+
+func (c *configAdapter) Scan(dest any) error                       { return nil }
+func (c *configAdapter) Load() error                               { return nil }
+func (c *configAdapter) Watch(key string, o config.Observer) error { return nil }
+func (c *configAdapter) Close() error                              { return nil }
+
+type configValueAdapter struct {
+	config *interfaces.Config
+}
+
+func (v *configValueAdapter) Scan(dest any) error {
+	cfg, ok := dest.(*interfaces.Config)
+	if !ok {
+		return nil
+	}
+	*cfg = *v.config
+	return nil
+}
+
+func (v *configValueAdapter) Bool() (bool, error)              { return false, nil }
+func (v *configValueAdapter) Int() (int64, error)              { return 0, nil }
+func (v *configValueAdapter) Float() (float64, error)          { return 0, nil }
+func (v *configValueAdapter) String() (string, error)          { return "", nil }
+func (v *configValueAdapter) Duration() (time.Duration, error) { return 0, nil }
+func (v *configValueAdapter) Slice() ([]config.Value, error)   { return nil, nil }
+func (v *configValueAdapter) Map() (map[string]config.Value, error) {
+	return nil, nil
+}
+func (v *configValueAdapter) Load() any     { return v.config }
+func (v *configValueAdapter) Store(val any) {}

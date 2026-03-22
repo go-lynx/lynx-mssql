@@ -1,6 +1,7 @@
 package mssql
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 
@@ -9,6 +10,8 @@ import (
 	"github.com/go-lynx/lynx/pkg/factory"
 	"github.com/go-lynx/lynx/plugins"
 )
+
+type dbProvider struct{}
 
 // init function registers the Microsoft SQL Server plugin to the global plugin factory.
 // This function is automatically called when the package is imported.
@@ -32,6 +35,9 @@ func init() {
 //
 // Note: This function will return an error if the plugin is not properly initialized or if the plugin manager cannot find the Microsoft SQL Server plugin.
 func GetMssqlClient() (*DBMssqlClient, error) {
+	if lynx.Lynx() == nil {
+		return nil, fmt.Errorf("lynx not initialized")
+	}
 	// Get the plugin with the specified name from the application's plugin manager,
 	// convert it to *DBMssqlClient type, and return it
 	plugin := lynx.Lynx().GetPluginManager().GetPlugin(pluginName)
@@ -57,6 +63,9 @@ func GetMssqlDB() (*sql.DB, error) {
 // GetDB gets the database connection from the MSSQL plugin.
 // This function provides a unified API consistent with MySQL and PostgreSQL plugins.
 func GetDB() (*sql.DB, error) {
+	if lynx.Lynx() == nil {
+		return nil, fmt.Errorf("lynx not initialized")
+	}
 	plugin := lynx.Lynx().GetPluginManager().GetPlugin(pluginName)
 	if plugin == nil {
 		return nil, fmt.Errorf("plugin %s not found", pluginName)
@@ -67,9 +76,48 @@ func GetDB() (*sql.DB, error) {
 	return nil, fmt.Errorf("plugin %s is not a SQLPlugin", pluginName)
 }
 
+// GetDBWithContext gets the database connection from the MSSQL plugin with context support.
+func GetDBWithContext(ctx context.Context) (*sql.DB, error) {
+	if lynx.Lynx() == nil {
+		return nil, fmt.Errorf("lynx not initialized")
+	}
+	plugin := lynx.Lynx().GetPluginManager().GetPlugin(pluginName)
+	if plugin == nil {
+		return nil, fmt.Errorf("plugin %s not found", pluginName)
+	}
+	if sqlPlugin, ok := plugin.(interfaces.SQLPlugin); ok {
+		return sqlPlugin.GetDBWithContext(ctx)
+	}
+	return nil, fmt.Errorf("plugin %s is not a SQLPlugin", pluginName)
+}
+
+// GetValidatedConn returns a validated connection from the current MSSQL pool.
+func GetValidatedConn(ctx context.Context) (*sql.Conn, error) {
+	if lynx.Lynx() == nil {
+		return nil, fmt.Errorf("lynx not initialized")
+	}
+	plugin := lynx.Lynx().GetPluginManager().GetPlugin(pluginName)
+	if plugin == nil {
+		return nil, fmt.Errorf("plugin %s not found", pluginName)
+	}
+	if sqlPlugin, ok := plugin.(interfaces.SQLPlugin); ok {
+		return sqlPlugin.GetValidatedConn(ctx)
+	}
+	return nil, fmt.Errorf("plugin %s is not a SQLPlugin", pluginName)
+}
+
+// GetProvider returns a stable provider for the current MSSQL pool.
+// The provider does not hold a concrete *sql.DB; each call resolves the current pool so it remains valid after reconnect.
+func GetProvider() interfaces.DBProvider {
+	return dbProvider{}
+}
+
 // GetDialect gets the database dialect.
 // This function provides a unified API consistent with MySQL and PostgreSQL plugins.
 func GetDialect() string {
+	if lynx.Lynx() == nil {
+		return ""
+	}
 	plugin := lynx.Lynx().GetPluginManager().GetPlugin(pluginName)
 	if plugin == nil {
 		return ""
@@ -83,6 +131,9 @@ func GetDialect() string {
 // IsConnected checks if the database is connected.
 // This function provides a unified API consistent with MySQL and PostgreSQL plugins.
 func IsConnected() bool {
+	if lynx.Lynx() == nil {
+		return false
+	}
 	plugin := lynx.Lynx().GetPluginManager().GetPlugin(pluginName)
 	if plugin == nil {
 		return false
@@ -96,6 +147,9 @@ func IsConnected() bool {
 // CheckHealth performs health check.
 // This function provides a unified API consistent with MySQL and PostgreSQL plugins.
 func CheckHealth() error {
+	if lynx.Lynx() == nil {
+		return fmt.Errorf("lynx not initialized")
+	}
 	plugin := lynx.Lynx().GetPluginManager().GetPlugin(pluginName)
 	if plugin == nil {
 		return fmt.Errorf("plugin %s not found", pluginName)
@@ -104,4 +158,16 @@ func CheckHealth() error {
 		return sqlPlugin.CheckHealth()
 	}
 	return fmt.Errorf("plugin %s is not a SQLPlugin", pluginName)
+}
+
+func (dbProvider) DB(ctx context.Context) (*sql.DB, error) {
+	return GetDBWithContext(ctx)
+}
+
+func (dbProvider) ValidatedConn(ctx context.Context) (*sql.Conn, error) {
+	return GetValidatedConn(ctx)
+}
+
+func (dbProvider) Dialect() string {
+	return GetDialect()
 }
