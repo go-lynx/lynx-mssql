@@ -10,6 +10,7 @@ import (
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/go-lynx/lynx-mssql/conf"
 	"github.com/go-lynx/lynx/plugins"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/durationpb"
 )
 
@@ -84,7 +85,8 @@ func (m *mockValue) Scan(dest interface{}) error {
 	if val, ok := m.values[m.key]; ok {
 		if mssqlConfig, ok := dest.(*conf.Mssql); ok {
 			if cfg, ok := val.(*conf.Mssql); ok {
-				*mssqlConfig = *cfg
+				proto.Reset(mssqlConfig)
+				proto.Merge(mssqlConfig, cfg)
 				return nil
 			}
 		}

@@ -64,8 +64,10 @@ The plugin follows the Lynx framework's layered architecture:
 lynx:
   mssql:
     driver: "mssql"
+    source: ""
     min_conn: 5
     max_conn: 20
+    max_idle_conn: 10
     max_idle_time: 300s
     max_life_time: 3600s
     
@@ -106,6 +108,42 @@ lynx:
       application_name: "Lynx-MSSQL-Plugin"
       workstation_id: "lynx-server"
 ```
+
+Either `source` or `server_config` must be provided. When `source` is empty, the plugin builds the DSN from `server_config`; when `source` is set, that DSN is used directly.
+
+### Proto Configuration Reference
+
+| Field | Proto Type | Default Value | Example | Notes |
+|-------|------------|---------------|---------|-------|
+| `driver` | `string` | `"mssql"` | `"mssql"` | SQL Server driver name used by the plugin. |
+| `source` | `string` | `""` | `"server=localhost;port=1433;database=master;user id=sa;password=secret"` | Optional DSN. If empty, the plugin builds one from `server_config`. |
+| `min_conn` | `int32` | `5` | `5` | Minimum connection count stored in plugin config. |
+| `max_conn` | `int32` | `20` | `50` | Maximum number of open connections. |
+| `max_life_time` | `google.protobuf.Duration` | `"3600s"` | `"3600s"` | Maximum lifetime of a pooled connection. |
+| `max_idle_time` | `google.protobuf.Duration` | `"300s"` | `"300s"` | Maximum idle lifetime of a pooled connection. |
+| `max_idle_conn` | `int32` | `0` | `10` | Explicit idle connection cap. If omitted, runtime conversion derives an idle cap from `max_conn` (`max_conn / 5`, minimum `1`). |
+| `server_config` | `ServerConfig` | object defaults below | `{ instance_name: "localhost", port: 1433 }` | Structured DSN builder for SQL Server-specific settings. |
+
+#### `server_config` sub-fields
+
+| Field | Proto Type | Default Value | Example | Notes |
+|-------|------------|---------------|---------|-------|
+| `server_config.instance_name` | `string` | `"localhost"` | `"sqlserver.internal"` | SQL Server host name or instance listener. |
+| `server_config.port` | `int32` | `1433` | `1433` | TCP port for SQL Server. |
+| `server_config.database` | `string` | `"master"` | `"orders"` | Default database name. |
+| `server_config.username` | `string` | `""` | `"sa"` | SQL authentication username. Leave empty for integrated auth scenarios handled outside the plugin DSN. |
+| `server_config.password` | `string` | `""` | `"secret"` | SQL authentication password. |
+| `server_config.encrypt` | `bool` | `false` | `true` | Enables transport encryption in generated DSN. |
+| `server_config.trust_server_certificate` | `bool` | `false` | `false` | Skips strict certificate validation when enabled. |
+| `server_config.connection_timeout` | `int32` | `30` | `30` | Connection timeout in seconds. |
+| `server_config.command_timeout` | `int32` | `30` | `30` | Command timeout in seconds. |
+| `server_config.application_name` | `string` | `"Lynx-MSSQL-Plugin"` | `"billing-api"` | Application name written into the connection string. |
+| `server_config.workstation_id` | `string` | `""` | `"lynx-server"` | Optional workstation identifier. |
+| `server_config.connection_pooling` | `bool` | `true` | `true` | Reserved for SQL Server DSN generation and operational intent. |
+| `server_config.max_pool_size` | `int32` | `20` | `50` | Documents desired pool ceiling for SQL Server-specific configuration. |
+| `server_config.min_pool_size` | `int32` | `5` | `10` | Documents desired pool floor for SQL Server-specific configuration. |
+| `server_config.pool_blocking_timeout` | `int32` | `30` | `30` | Pool blocking timeout in seconds. |
+| `server_config.pool_lifetime_timeout` | `int32` | `3600` | `3600` | Pool lifetime timeout in seconds. |
 
 ## Usage
 

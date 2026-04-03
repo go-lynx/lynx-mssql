@@ -20,7 +20,7 @@ import (
 // Plugin metadata constants
 const (
 	pluginName        = "mssql.client"
-	pluginVersion     = "v1.6.0-beta"
+	pluginVersion     = "v1.5.4"
 	pluginDescription = "Microsoft SQL Server client plugin for lynx framework"
 	confPrefix        = "lynx.mssql"
 )
