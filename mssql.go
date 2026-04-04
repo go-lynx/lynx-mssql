@@ -31,8 +31,21 @@ type DBMssqlClient struct {
 	config            *conf.Mssql
 	closeChan         chan struct{}
 	closeOnce         sync.Once // Protect against multiple close operations
+	backgroundWG      sync.WaitGroup
 	closed            bool
 	prometheusMetrics *PrometheusMetrics
+}
+
+func newSQLPlugin(config *interfaces.Config) *base.SQLPlugin {
+	return base.NewBaseSQLPlugin(
+		plugins.GeneratePluginID("", pluginName, pluginVersion),
+		pluginName,
+		pluginDescription,
+		pluginVersion,
+		confPrefix,
+		102,
+		config,
+	)
 }
 
 // NewMssqlClient creates a new Microsoft SQL Server client plugin instance
@@ -70,15 +83,7 @@ func NewMssqlClient() *DBMssqlClient {
 	// Convert conf.Mssql to interfaces.Config
 	baseConfig := convertToBaseConfig(mssqlConf)
 
-	c.SQLPlugin = base.NewBaseSQLPlugin(
-		plugins.GeneratePluginID("", pluginName, pluginVersion),
-		pluginName,
-		pluginDescription,
-		pluginVersion,
-		confPrefix,
-		102, // Weight for MSSQL
-		baseConfig,
-	)
+	c.SQLPlugin = newSQLPlugin(baseConfig)
 	return c
 }
 
@@ -109,15 +114,7 @@ func (m *DBMssqlClient) InitializeResources(rt plugins.Runtime) error {
 		m.config.Source = buildDSN(m.config)
 	}
 
-	m.SQLPlugin = base.NewBaseSQLPlugin(
-		plugins.GeneratePluginID("", pluginName, pluginVersion),
-		pluginName,
-		pluginDescription,
-		pluginVersion,
-		confPrefix,
-		102,
-		convertToBaseConfig(m.config),
-	)
+	m.SQLPlugin = newSQLPlugin(convertToBaseConfig(m.config))
 
 	// Initialize SQL plugin
 	if err := m.SQLPlugin.InitializeResources(&runtimeConfigAdapter{
@@ -132,6 +129,8 @@ func (m *DBMssqlClient) InitializeResources(rt plugins.Runtime) error {
 
 // StartupTasks initializes database connection and performs health check
 func (m *DBMssqlClient) StartupTasks() error {
+	m.prepareRuntimeState()
+
 	log.Infof("initializing Microsoft SQL Server database connection")
 
 	// Initialize Prometheus metrics
@@ -149,6 +148,7 @@ func (m *DBMssqlClient) StartupTasks() error {
 		m.config.MaxConn, m.config.MinConn)
 
 	// Start background tasks
+	m.backgroundWG.Add(1)
 	go m.backgroundTasks()
 
 	return nil
@@ -172,6 +172,8 @@ func (m *DBMssqlClient) CleanupTasks() error {
 	if err := m.SQLPlugin.CleanupTasks(); err != nil {
 		return err
 	}
+
+	m.backgroundWG.Wait()
 
 	log.Infof("Microsoft SQL Server client plugin successfully shut down")
 	return nil
@@ -208,6 +210,8 @@ func (m *DBMssqlClient) updateStats() {
 
 // backgroundTasks runs background maintenance tasks
 func (m *DBMssqlClient) backgroundTasks() {
+	defer m.backgroundWG.Done()
+
 	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
 
@@ -221,6 +225,16 @@ func (m *DBMssqlClient) backgroundTasks() {
 			return
 		}
 	}
+}
+
+func (m *DBMssqlClient) prepareRuntimeState() {
+	if !m.closed {
+		return
+	}
+	m.SQLPlugin = newSQLPlugin(convertToBaseConfig(m.config))
+	m.closeChan = make(chan struct{})
+	m.closeOnce = sync.Once{}
+	m.closed = false
 }
 
 // GetMssqlConfig returns the current MSSQL configuration
@@ -429,6 +443,18 @@ func buildDSN(mssqlConf *conf.Mssql) string {
 
 	if mssqlConf.ServerConfig.ApplicationName != "" {
 		dsn += fmt.Sprintf(";app name=%s", mssqlConf.ServerConfig.ApplicationName)
+	}
+
+	if mssqlConf.ServerConfig.Username != "" {
+		dsn += fmt.Sprintf(";user id=%s", mssqlConf.ServerConfig.Username)
+	}
+
+	if mssqlConf.ServerConfig.Password != "" {
+		dsn += fmt.Sprintf(";password=%s", mssqlConf.ServerConfig.Password)
+	}
+
+	if mssqlConf.ServerConfig.WorkstationId != "" {
+		dsn += fmt.Sprintf(";workstation id=%s", mssqlConf.ServerConfig.WorkstationId)
 	}
 
 	if mssqlConf.ServerConfig.ConnectionPooling {

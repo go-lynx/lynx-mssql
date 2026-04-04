@@ -3,6 +3,7 @@ package mssql
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -756,6 +757,30 @@ func TestDBMssqlClient_DefaultConfig(t *testing.T) {
 	}
 }
 
+func TestDBMssqlClient_PrepareRuntimeState_ReopensStateAfterCleanup(t *testing.T) {
+	client := NewMssqlClient()
+	oldSQLPlugin := client.SQLPlugin
+
+	client.closed = true
+	close(client.closeChan)
+
+	client.prepareRuntimeState()
+
+	if client.closed {
+		t.Fatal("prepareRuntimeState should reset closed state")
+	}
+
+	select {
+	case <-client.closeChan:
+		t.Fatal("prepareRuntimeState should replace closeChan with an open channel")
+	default:
+	}
+
+	if client.SQLPlugin == oldSQLPlugin {
+		t.Fatal("prepareRuntimeState should rebuild the base SQL plugin after cleanup")
+	}
+}
+
 func TestDBMssqlClient_ConvertToBaseConfig(t *testing.T) {
 	mssqlConfig := &conf.Mssql{
 		Driver:      "mssql",
@@ -786,6 +811,57 @@ func TestDBMssqlClient_ConvertToBaseConfig(t *testing.T) {
 
 	if baseConfig.ConnMaxIdleTime != 300 {
 		t.Errorf("Expected ConnMaxIdleTime 300, got %d", baseConfig.ConnMaxIdleTime)
+	}
+}
+
+func TestBuildDSN_IncludesAuthenticationAndWorkstation(t *testing.T) {
+	mssqlConfig := &conf.Mssql{
+		Driver: "mssql",
+		ServerConfig: &conf.ServerConfig{
+			InstanceName:  "db.example.internal",
+			Port:          1433,
+			Database:      "orders",
+			Username:      "service_user",
+			Password:      "secret",
+			WorkstationId: "api-node-01",
+		},
+	}
+
+	dsn := buildDSN(mssqlConfig)
+
+	for _, want := range []string{
+		"server=db.example.internal",
+		"database=orders",
+		"user id=service_user",
+		"password=secret",
+		"workstation id=api-node-01",
+	} {
+		if !strings.Contains(dsn, want) {
+			t.Fatalf("expected DSN %q to contain %q", dsn, want)
+		}
+	}
+}
+
+func TestDBMssqlClient_CleanupTasks_WaitsForBackgroundTasks(t *testing.T) {
+	client := NewMssqlClient()
+
+	client.backgroundWG.Add(1)
+	go client.backgroundTasks()
+
+	if err := client.CleanupTasks(); err != nil {
+		t.Fatalf("CleanupTasks failed: %v", err)
+	}
+
+	done := make(chan struct{})
+	go func() {
+		client.backgroundWG.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("background tasks did not stop before CleanupTasks returned")
 	}
 }
 
