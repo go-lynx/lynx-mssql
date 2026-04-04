@@ -84,6 +84,7 @@ func NewMssqlClient() *DBMssqlClient {
 	baseConfig := convertToBaseConfig(mssqlConf)
 
 	c.SQLPlugin = newSQLPlugin(baseConfig)
+	c.SQLPlugin.SetProvider(dbProvider{})
 	return c
 }
 
@@ -115,6 +116,7 @@ func (m *DBMssqlClient) InitializeResources(rt plugins.Runtime) error {
 	}
 
 	m.SQLPlugin = newSQLPlugin(convertToBaseConfig(m.config))
+	m.SQLPlugin.SetProvider(dbProvider{})
 
 	// Initialize SQL plugin
 	if err := m.SQLPlugin.InitializeResources(&runtimeConfigAdapter{
@@ -232,6 +234,7 @@ func (m *DBMssqlClient) prepareRuntimeState() {
 		return
 	}
 	m.SQLPlugin = newSQLPlugin(convertToBaseConfig(m.config))
+	m.SQLPlugin.SetProvider(dbProvider{})
 	m.closeChan = make(chan struct{})
 	m.closeOnce = sync.Once{}
 	m.closed = false
